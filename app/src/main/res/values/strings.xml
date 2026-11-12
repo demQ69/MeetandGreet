@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">Meet-and-Greet</string>
+    <string name="login_title">Вход в Meet &amp; Greet</string>
+    <string name="hint_email">Email (например, anna@college.ru)</string>
+    <string name="hint_password">Пароль</string>
+    <string name="btn_login">Войти</string>
+    <string name="tab_discover">Анкеты</string>
+    <string name="tab_matches">Мэтчи и чаты</string>
+    <string name="tab_profile">Профиль</string>
+    <string name="btn_like">Нравится</string>
+    <string name="btn_pass">Пропустить</string>
 </resources>
