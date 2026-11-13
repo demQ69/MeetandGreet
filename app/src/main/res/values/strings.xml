@@ -1,12 +1,21 @@
 <resources>
-    <string name="app_name">Meet-and-Greet</string>
-    <string name="login_title">Вход в Meet &amp; Greet</string>
-    <string name="hint_email">Email (например, anna@college.ru)</string>
+    <string name="app_name">Флагманские знакомства</string>
+    <string name="header_brand">Флагманские</string>
+    <string name="header_subbrand">знакомства</string>
+    <string name="login_title">Флагманские знакомства</string>
+    <string name="hint_email">Почта колледжа (@itmoscow.pro)</string>
     <string name="hint_password">Пароль</string>
     <string name="btn_login">Войти</string>
-    <string name="tab_discover">Анкеты</string>
-    <string name="tab_matches">Мэтчи и чаты</string>
-    <string name="tab_profile">Профиль</string>
+    <string name="screen_search_title">Поиск</string>
+    <string name="screen_search_subtitle">Новые знакомства начинаются здесь</string>
+    <string name="screen_settings_title">Настройки поиска</string>
+    <string name="screen_settings_subtitle">Найди тех, с кем тебе по пути</string>
+    <string name="btn_show_profiles">Показать анкеты</string>
+    <string name="tab_search">Поиск</string>
+    <string name="tab_you">Вы</string>
+    <string name="tab_to_you">Вам</string>
+    <string name="tab_mutual">Взаимно</string>
+    <string name="tab_rating">Рейтинг</string>
     <string name="btn_like">Нравится</string>
     <string name="btn_pass">Пропустить</string>
 </resources>

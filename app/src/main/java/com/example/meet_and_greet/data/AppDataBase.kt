@@ -11,9 +11,10 @@ import androidx.room.RoomDatabase
         LoginAttemptEntity::class,
         LikeEntity::class,
         MatchEntity::class,
-        MessageEntity::class
+        MessageEntity::class,
+        ReportEntity::class
     ],
-    version = 2,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -30,7 +31,7 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     "college_dating.db"
                 )
-                    .fallbackToDestructiveMigration()
+                    .fallbackToDestructiveMigration(dropAllTables = true)
                     .build()
                 INSTANCE = instance
                 instance

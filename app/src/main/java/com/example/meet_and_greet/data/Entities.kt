@@ -11,9 +11,13 @@ data class StudentEntity(
     val full_name: String,
     val faculty: String = "Информационные технологии",
     val study_group: String = "ИС-21",
-    val age: Int = 20,
-    val bio: String = "Студент колледжа",
-    val interests: String = "Музыка, Кино, Спорт",
+    val age: Int = 18,
+    val bio: String = "Люблю рисовать и читать",
+    val interests: String = "Рисование, Чтение",
+    val looking_for: String = "relationship", // "relationship" | "friends"
+    val photo_uri: String? = null, // Путь к загруженному фото из галереи или null
+    val email_verified: Boolean = true,
+    val likes_received: Int = 10,
     val created_at: Long = System.currentTimeMillis()
 )
 
@@ -49,4 +53,14 @@ data class MessageEntity(
     val sender_id: Int,
     val body: String,
     val sent_at: Long = System.currentTimeMillis()
+)
+
+@Entity(tableName = "reports")
+data class ReportEntity(
+    @PrimaryKey(autoGenerate = true) val id: Int = 0,
+    val reporter_id: Int,
+    val reported_student_id: Int,
+    val reason: String,
+    val is_blocked: Boolean = true,
+    val created_at: Long = System.currentTimeMillis()
 )
