@@ -53,9 +53,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.meet_and_greet.data.*
 import com.example.meet_and_greet.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import java.net.URL
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.roundToInt
@@ -64,6 +69,9 @@ import kotlin.math.sin
 private const val PREFS_NAME = "flagman_session_prefs"
 private const val KEY_LOGGED_STUDENT_ID = "logged_student_id"
 private const val KEY_LAST_EMAIL = "last_email"
+private const val KEY_SERVER_URL = "server_url"
+
+private val remoteAvatarCache = ConcurrentHashMap<String, Bitmap>()
 
 // --- Копирование выбранного фото из галереи во внутреннее хранилище приложения ---
 fun copyUriToInternalStorage(context: Context, uri: Uri): String? {
@@ -83,17 +91,42 @@ fun copyUriToInternalStorage(context: Context, uri: Uri): String? {
 
 @Composable
 fun rememberAvatarBitmap(photoUri: String?): Bitmap? {
-    return remember(photoUri) {
-        if (photoUri.isNullOrBlank()) null
-        else {
-            try {
+    val bmp by produceState<Bitmap?>(initialValue = null, key1 = photoUri) {
+        if (photoUri.isNullOrBlank()) {
+            value = null
+            return@produceState
+        }
+        if (photoUri.startsWith("http://") || photoUri.startsWith("https://")) {
+            val cached = remoteAvatarCache[photoUri]
+            if (cached != null) {
+                value = cached
+                return@produceState
+            }
+            value = withContext(Dispatchers.IO) {
+                try {
+                    val conn = URL(photoUri).openConnection().apply {
+                        connectTimeout = 8000
+                        readTimeout = 10000
+                    }
+                    conn.getInputStream().use { stream ->
+                        BitmapFactory.decodeStream(stream)?.also { decoded ->
+                            remoteAvatarCache[photoUri] = decoded
+                        }
+                    }
+                } catch (_: Exception) {
+                    null
+                }
+            }
+        } else {
+            value = try {
                 val file = File(photoUri)
                 if (file.exists()) BitmapFactory.decodeFile(file.absolutePath) else null
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 null
             }
         }
     }
+    return bmp
 }
 
 class MainActivity : ComponentActivity() {
@@ -124,8 +157,10 @@ fun MeetAndGreetApp(repository: AuthRepository) {
     var currentStudent by remember { mutableStateOf<StudentEntity?>(null) }
     var isRestoringSession by remember { mutableStateOf(true) }
     var lastEmail by remember { mutableStateOf(prefs.getString(KEY_LAST_EMAIL, "") ?: "") }
+    var serverUrl by remember { mutableStateOf(prefs.getString(KEY_SERVER_URL, "") ?: "") }
 
     LaunchedEffect(Unit) {
+        repository.updateServerUrl(serverUrl)
         repository.seedTestDataIfNeeded()
         val savedStudentId = prefs.getInt(KEY_LOGGED_STUDENT_ID, -1)
         if (savedStudentId > 0) {
@@ -155,6 +190,12 @@ fun MeetAndGreetApp(repository: AuthRepository) {
         LoginScreen(
             repository = repository,
             initialEmail = lastEmail,
+            initialServerUrl = serverUrl,
+            onServerUrlSaved = { newUrl ->
+                serverUrl = newUrl
+                repository.updateServerUrl(newUrl)
+                prefs.edit().putString(KEY_SERVER_URL, repository.serverBaseUrl).apply()
+            },
             onLoginSuccess = { student ->
                 prefs.edit()
                     .putInt(KEY_LOGGED_STUDENT_ID, student.id)
@@ -1529,6 +1570,12 @@ fun IncomingLikesScreen(
 
     LaunchedEffect(currentStudent.id) {
         loadIncoming()
+        if (repository.isRemoteMode()) {
+            while (true) {
+                delay(5000)
+                incomingStudents = repository.getIncomingLikes(currentStudent.id)
+            }
+        }
     }
 
     Column(
@@ -1595,6 +1642,12 @@ fun MatchesScreen(
 
     LaunchedEffect(currentStudent.id) {
         loadMatches()
+        if (repository.isRemoteMode()) {
+            while (true) {
+                delay(5000)
+                matches = repository.getMatchesWithPartners(currentStudent.id)
+            }
+        }
     }
 
     Column(
@@ -1690,6 +1743,12 @@ fun ChatScreen(
 
     LaunchedEffect(matchWithPartner.match.id) {
         loadMessages()
+        if (repository.isRemoteMode()) {
+            while (true) {
+                delay(2500)
+                messages = repository.getMessages(matchWithPartner.match.id)
+            }
+        }
     }
 
     if (showReportDialog) {
@@ -2491,6 +2550,8 @@ fun ProfileScreen(
 fun LoginScreen(
     repository: AuthRepository,
     initialEmail: String = "",
+    initialServerUrl: String = "",
+    onServerUrlSaved: (String) -> Unit = {},
     onLoginSuccess: (StudentEntity) -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -2501,6 +2562,11 @@ fun LoginScreen(
         listOf("Кино", "Путешествия", "Спорт"),
         listOf("Игры", "Кулинария", "Фотография")
     )
+
+    var serverUrlInput by remember(initialServerUrl) { mutableStateOf(initialServerUrl) }
+    var serverStatusText by remember { mutableStateOf("") }
+    var serverStatusOk by remember { mutableStateOf<Boolean?>(null) }
+    var showServerPanel by remember { mutableStateOf(true) }
 
     var isRegisterMode by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf(initialEmail) }
@@ -2675,7 +2741,128 @@ fun LoginScreen(
             fontSize = 15.sp
         )
 
-        Spacer(modifier = Modifier.height(18.dp))
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Блок подключения к Java-серверу на ПК (для общения с другом по мобильной сети)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(FlagmanSurface)
+                .border(1.dp, FlagmanBorder, RoundedCornerShape(16.dp))
+                .padding(12.dp)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showServerPanel = !showServerPanel },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (repository.isRemoteMode()) "Режим: Общий сервер ПК"
+                        else "Режим: Локально (один телефон)",
+                        color = FlagmanTextPrimary,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (repository.isRemoteMode()) {
+                        Text(
+                            text = repository.serverBaseUrl,
+                            color = FlagmanAccentBlue,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+                Text(
+                    text = if (showServerPanel) "Свернуть ▲" else "Настроить ▼",
+                    color = FlagmanPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold
+                )
+            }
+
+            if (showServerPanel) {
+                Spacer(modifier = Modifier.height(10.dp))
+                OutlinedTextField(
+                    value = serverUrlInput,
+                    onValueChange = {
+                        serverUrlInput = it
+                        serverStatusText = ""
+                    },
+                    label = { Text("Адрес сервера (например, https://xxx.trycloudflare.com)") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = textFieldColors,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                serverStatusText = "Проверка соединения..."
+                                serverStatusOk = null
+                                val res = repository.checkServerHealth(serverUrlInput)
+                                if (res.isSuccess) {
+                                    onServerUrlSaved(serverUrlInput)
+                                    serverStatusOk = true
+                                    serverStatusText = res.getOrNull() ?: "Подключено!"
+                                } else {
+                                    serverStatusOk = false
+                                    serverStatusText = res.exceptionOrNull()?.message ?: "Ошибка подключения"
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = FlagmanPrimary,
+                            contentColor = FlagmanOnPrimary
+                        ),
+                        contentPadding = PaddingValues(vertical = 8.dp)
+                    ) {
+                        Text("Подключить", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            serverUrlInput = ""
+                            onServerUrlSaved("")
+                            serverStatusOk = true
+                            serverStatusText = "Включен автономный режим (локальная БД телефона)"
+                            scope.launch { repository.seedTestDataIfNeeded() }
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, FlagmanBorder),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                    ) {
+                        Text("Оффлайн", color = FlagmanTextSecondary, fontSize = 12.sp)
+                    }
+                }
+
+                if (serverStatusText.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(
+                        text = serverStatusText,
+                        color = when (serverStatusOk) {
+                            true -> Color(0xFF81C784)
+                            false -> Color(0xFFFF8A9B)
+                            null -> FlagmanAccentBlue
+                        },
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
 
         // Переключатель «Вход» / «Регистрация»
         Row(
