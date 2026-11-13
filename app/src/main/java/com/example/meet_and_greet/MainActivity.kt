@@ -56,7 +56,10 @@ import com.example.meet_and_greet.ui.theme.*
 import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
+import kotlin.math.PI
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 private const val PREFS_NAME = "flagman_session_prefs"
 private const val KEY_LOGGED_STUDENT_ID = "logged_student_id"
@@ -177,10 +180,11 @@ fun MeetAndGreetApp(repository: AuthRepository) {
     }
 }
 
-// ======================= ВЕРХНЯЯ ШАПКА «ФЛАГМАНСКИЕ ЗНАКОМСТВА» =======================
+// ======================= ВЕРХНЯЯ ШАПКА «MEET-AND-GREET» =======================
 
 @Composable
 fun FlagmanTopBar(
+    isMenuActive: Boolean = false,
     isFilterActive: Boolean = false,
     onMenuClick: () -> Unit,
     onFilterClick: () -> Unit
@@ -189,6 +193,7 @@ fun FlagmanTopBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(FlagmanBg)
+            .statusBarsPadding()
     ) {
         Row(
             modifier = Modifier
@@ -201,8 +206,12 @@ fun FlagmanTopBar(
                 modifier = Modifier
                     .size(42.dp)
                     .clip(CircleShape)
-                    .background(FlagmanSurface)
-                    .border(1.dp, FlagmanBorder, CircleShape)
+                    .background(if (isMenuActive) FlagmanSurfaceSelected else FlagmanSurface)
+                    .border(
+                        width = 1.dp,
+                        color = if (isMenuActive) FlagmanBorderSelected else FlagmanBorder,
+                        shape = CircleShape
+                    )
                     .clickable { onMenuClick() },
                 contentAlignment = Alignment.Center
             ) {
@@ -236,7 +245,7 @@ fun FlagmanTopBar(
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Флагманские",
+                    text = "Meet-and-Greet",
                     color = FlagmanTextPrimary,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.Bold,
@@ -250,32 +259,49 @@ fun FlagmanTopBar(
                 )
             }
 
-            // Кнопка фильтров справа («Настройки поиска»)
+            // Кнопка настроек поиска справа (такой же тёмный кружок + иконка шестерёнки)
             Box(
                 modifier = Modifier
                     .size(42.dp)
-                    .clip(RoundedCornerShape(12.dp))
+                    .clip(CircleShape)
                     .background(if (isFilterActive) FlagmanSurfaceSelected else FlagmanSurface)
                     .border(
                         width = 1.dp,
                         color = if (isFilterActive) FlagmanBorderSelected else FlagmanBorder,
-                        shape = RoundedCornerShape(12.dp)
+                        shape = CircleShape
                     )
                     .clickable { onFilterClick() },
                 contentAlignment = Alignment.Center
             ) {
-                Canvas(modifier = Modifier.size(18.dp)) {
-                    val stroke = 1.8.dp.toPx()
-                    val y1 = size.height * 0.22f
-                    val y2 = size.height * 0.5f
-                    val y3 = size.height * 0.78f
-                    drawLine(FlagmanTextPrimary, Offset(0f, y1), Offset(size.width, y1), stroke, StrokeCap.Round)
-                    drawLine(FlagmanTextPrimary, Offset(0f, y2), Offset(size.width, y2), stroke, StrokeCap.Round)
-                    drawLine(FlagmanTextPrimary, Offset(0f, y3), Offset(size.width, y3), stroke, StrokeCap.Round)
+                Canvas(modifier = Modifier.size(20.dp)) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val radius = size.minDimension * 0.46f
+                    val ringRadius = radius * 0.58f
+                    val gearColor = if (isFilterActive) FlagmanPrimary else FlagmanTextPrimary
 
-                    drawLine(FlagmanPrimary, Offset(size.width * 0.32f, y1 - 3.dp.toPx()), Offset(size.width * 0.32f, y1 + 3.dp.toPx()), stroke * 1.2f, StrokeCap.Round)
-                    drawLine(FlagmanPrimary, Offset(size.width * 0.68f, y2 - 3.dp.toPx()), Offset(size.width * 0.68f, y2 + 3.dp.toPx()), stroke * 1.2f, StrokeCap.Round)
-                    drawLine(FlagmanPrimary, Offset(size.width * 0.42f, y3 - 3.dp.toPx()), Offset(size.width * 0.42f, y3 + 3.dp.toPx()), stroke * 1.2f, StrokeCap.Round)
+                    drawCircle(
+                        color = gearColor,
+                        radius = ringRadius,
+                        center = Offset(cx, cy),
+                        style = Stroke(width = 2.1.dp.toPx())
+                    )
+
+                    val toothStroke = 2.4.dp.toPx()
+                    val innerR = radius * 0.68f
+                    val outerR = radius * 0.96f
+                    for (i in 0 until 8) {
+                        val angle = (i * 45.0) * PI / 180.0
+                        val cosA = cos(angle).toFloat()
+                        val sinA = sin(angle).toFloat()
+                        drawLine(
+                            color = gearColor,
+                            start = Offset(cx + innerR * cosA, cy + innerR * sinA),
+                            end = Offset(cx + outerR * cosA, cy + outerR * sinA),
+                            strokeWidth = toothStroke,
+                            cap = StrokeCap.Round
+                        )
+                    }
                 }
             }
         }
@@ -297,6 +323,7 @@ fun FlagmanBottomBar(
         modifier = Modifier
             .fillMaxWidth()
             .background(FlagmanBg)
+            .navigationBarsPadding()
     ) {
         HorizontalDivider(color = Color(0xFF171B2A), thickness = 1.dp)
         Row(
@@ -422,6 +449,7 @@ fun MainFlagmanScreen(
         containerColor = FlagmanBg,
         topBar = {
             FlagmanTopBar(
+                isMenuActive = showProfileSheet,
                 isFilterActive = showSearchSettings,
                 onMenuClick = {
                     activeChatMatch = null
@@ -1444,6 +1472,7 @@ fun OutgoingLikesScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .padding(16.dp)
     ) {
         Text(
@@ -1505,6 +1534,7 @@ fun IncomingLikesScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .padding(16.dp)
     ) {
         Text(
@@ -1570,6 +1600,7 @@ fun MatchesScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .padding(16.dp)
     ) {
         Text(
@@ -1683,6 +1714,7 @@ fun ChatScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .padding(16.dp)
     ) {
         Row(
@@ -1706,7 +1738,9 @@ fun ChatScreen(
                     Text(
                         text = "${matchWithPartner.partner.faculty} • ${matchWithPartner.partner.study_group}",
                         color = FlagmanTextSecondary,
-                        fontSize = 11.sp
+                        fontSize = 11.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -1837,6 +1871,7 @@ fun RatingScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .imePadding()
             .padding(16.dp)
     ) {
         Row(
@@ -2620,6 +2655,8 @@ fun LoginScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(FlagmanBg)
+            .statusBarsPadding()
+            .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp, vertical = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -2627,7 +2664,7 @@ fun LoginScreen(
         Spacer(modifier = Modifier.height(10.dp))
 
         Text(
-            text = "Флагманские",
+            text = "Meet-and-Greet",
             color = FlagmanTextPrimary,
             fontSize = 30.sp,
             fontWeight = FontWeight.Bold

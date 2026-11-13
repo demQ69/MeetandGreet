@@ -149,8 +149,9 @@ class AuthRepository(private val dao: AuthDao) {
         return Result.success(newStudent.copy(id = newId))
     }
 
-    // --- Предзаполнение тестовых анкет («Флагманские знакомства») ---
+    // --- Предзаполнение тестовых анкет («Meet-and-Greet») ---
     suspend fun seedTestDataIfNeeded() {
+        dao.migrateOldBrandingMessages()
         val existingAnna = dao.getStudentByEmail("anna@itmoscow.pro")
         if (existingAnna != null) return
 
@@ -306,7 +307,7 @@ class AuthRepository(private val dao: AuthDao) {
                     MessageEntity(
                         match_id = matchId,
                         sender_id = targetStudentId,
-                        body = "Привет! У нас совпали интересы во Флагманских знакомствах 😊"
+                        body = "Привет! У нас совпали интересы в Meet-and-Greet 😊"
                     )
                 )
                 return partner

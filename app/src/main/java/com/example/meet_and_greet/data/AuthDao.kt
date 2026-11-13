@@ -121,6 +121,9 @@ interface AuthDao {
     @Insert
     suspend fun insertMessage(message: MessageEntity): Long
 
+    @Query("UPDATE messages SET body = REPLACE(body, 'во Флагманских знакомствах', 'в Meet-and-Greet') WHERE body LIKE '%Флагманских знакомствах%'")
+    suspend fun migrateOldBrandingMessages()
+
     // --- Модуль модерации, жалоб и блокировок ---
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertReport(report: ReportEntity): Long

@@ -1,8 +1,8 @@
 <resources>
-    <string name="app_name">Флагманские знакомства</string>
-    <string name="header_brand">Флагманские</string>
+    <string name="app_name">Meet-and-Greet</string>
+    <string name="header_brand">Meet-and-Greet</string>
     <string name="header_subbrand">знакомства</string>
-    <string name="login_title">Флагманские знакомства</string>
+    <string name="login_title">Вход в Meet &amp; Greet</string>
     <string name="hint_email">Почта колледжа (@itmoscow.pro)</string>
     <string name="hint_password">Пароль</string>
     <string name="btn_login">Войти</string>
